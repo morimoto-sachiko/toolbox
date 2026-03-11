@@ -1,0 +1,83 @@
+Option Explicit
+
+Public Sub ApplyTextToExistingTable()
+
+    Dim filePath As String
+    filePath = "C:\Temp\input.csv"
+
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Worksheets("Sheet1")
+
+    Dim tbl As ListObject
+    Set tbl = ws.ListObjects("tbl_players")
+
+    ApplyCsvToTable tbl, filePath, ","
+
+    MsgBox "テーブル更新完了"
+
+End Sub
+
+
+Private Sub ApplyCsvToTable(tbl As ListObject, filePath As String, delimiter As String)
+
+    Dim lines() As String
+    Dim text As String
+    
+    text = ReadAllText(filePath)
+
+    lines = Split(text, vbCrLf)
+
+    Dim rowCount As Long
+    rowCount = UBound(lines)
+
+    If rowCount <= 0 Then Exit Sub
+
+    Dim colCount As Long
+    colCount = UBound(Split(lines(0), delimiter)) + 1
+
+    '既存データ削除
+    If Not tbl.DataBodyRange Is Nothing Then
+        tbl.DataBodyRange.Delete
+    End If
+
+    Dim r As Long
+    Dim values() As Variant
+    
+    ReDim values(1 To rowCount, 1 To colCount)
+
+    For r = 1 To rowCount
+        
+        Dim cols() As String
+        cols = Split(lines(r), delimiter)
+        
+        Dim c As Long
+        For c = 1 To colCount
+            values(r, c) = cols(c - 1)
+        Next
+        
+    Next
+
+    'テーブル行追加
+    tbl.Resize tbl.Range.Resize(rowCount + 1, colCount)
+
+    tbl.DataBodyRange.Value = values
+
+End Sub
+
+
+Private Function ReadAllText(path As String) As String
+
+    Dim stream As Object
+    Set stream = CreateObject("ADODB.Stream")
+
+    stream.Type = 2
+    stream.Charset = "utf-8"
+    stream.Open
+
+    stream.LoadFromFile path
+
+    ReadAllText = stream.ReadText
+
+    stream.Close
+
+End Function
