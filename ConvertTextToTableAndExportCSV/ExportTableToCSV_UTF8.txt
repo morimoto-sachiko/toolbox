@@ -1,0 +1,81 @@
+Option Explicit
+
+Public Sub ExportTableToCSV_UTF8(tbl As ListObject, filePath As String)
+
+    Dim stream As Object
+    Set stream = CreateObject("ADODB.Stream")
+
+    ' UTF8設定
+    stream.Type = 2 'adTypeText
+    stream.Charset = "utf-8"
+    stream.Open
+    
+    Dim line As String
+    Dim r As ListRow
+    Dim c As ListColumn
+
+    '================
+    ' ヘッダー
+    '================
+    
+    line = ""
+    
+    For Each c In tbl.ListColumns
+        line = line & EscapeCSV(c.Name) & ","
+    Next
+    
+    line = Left(line, Len(line) - 1)
+    
+    stream.WriteText line & vbCrLf
+
+    '================
+    ' データ
+    '================
+    
+    For Each r In tbl.ListRows
+        
+        line = ""
+        
+        For Each c In tbl.ListColumns
+            line = line & EscapeCSV(r.Range.Cells(1, c.Index).Value) & ","
+        Next
+        
+        line = Left(line, Len(line) - 1)
+        
+        stream.WriteText line & vbCrLf
+        
+    Next
+
+    '================
+    ' 保存
+    '================
+    
+    stream.SaveToFile filePath, 2 'adSaveCreateOverWrite
+    stream.Close
+
+End Sub
+
+
+'============================
+' CSVエスケープ
+'============================
+Private Function EscapeCSV(value As Variant) As String
+
+    Dim s As String
+    s = CStr(value)
+
+    If InStr(s, """") > 0 Then
+        s = Replace(s, """", """""")
+    End If
+
+    If InStr(s, ",") > 0 Or _
+       InStr(s, vbCrLf) > 0 Or _
+       InStr(s, """") > 0 Then
+        
+        s = """" & s & """"
+        
+    End If
+
+    EscapeCSV = s
+
+End Function

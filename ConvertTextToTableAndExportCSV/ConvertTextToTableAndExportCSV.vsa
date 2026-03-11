@@ -1,0 +1,129 @@
+Option Explicit
+
+'=============================
+' メイン処理
+'=============================
+Public Sub ConvertTextToTableAndExportCSV()
+
+    Dim txtPath As String
+    Dim csvPath As String
+    
+    txtPath = "C:\Temp\input.txt"
+    csvPath = "C:\Temp\output.csv"
+    
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Worksheets(1)
+    
+    ws.Cells.Clear
+    
+    ' テキストをテーブルに読み込み
+    Dim tbl As ListObject
+    Set tbl = ImportTextToTable(ws, txtPath, "ImportedTable")
+    
+    ' テーブルをCSV出力
+    ExportTableToCSV tbl, csvPath
+    
+    MsgBox "完了しました", vbInformation
+    
+End Sub
+
+
+'=============================
+' テキスト → テーブル
+'=============================
+Private Function ImportTextToTable(ws As Worksheet, _
+                                   filePath As String, _
+                                   tableName As String) As ListObject
+
+    Dim qt As QueryTable
+    
+    '既存Query削除
+    For Each qt In ws.QueryTables
+        qt.Delete
+    Next
+    
+    'テキストインポート
+    Set qt = ws.QueryTables.Add( _
+        Connection:="TEXT;" & filePath, _
+        Destination:=ws.Range("A1"))
+    
+    With qt
+        .TextFileParseType = xlDelimited
+        .TextFileCommaDelimiter = True
+        .TextFileTabDelimiter = False
+        .TextFileSemicolonDelimiter = False
+        .TextFileOtherDelimiter = ""
+        
+        .AdjustColumnWidth = True
+        .Refresh BackgroundQuery:=False
+    End With
+    
+    Dim lastRow As Long
+    Dim lastCol As Long
+    
+    lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    lastCol = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
+    
+    Dim tblRange As Range
+    Set tblRange = ws.Range(ws.Cells(1, 1), ws.Cells(lastRow, lastCol))
+    
+    '既存テーブル削除
+    Dim tbl As ListObject
+    For Each tbl In ws.ListObjects
+        tbl.Delete
+    Next
+    
+    'テーブル作成
+    Set tbl = ws.ListObjects.Add( _
+        SourceType:=xlSrcRange, _
+        Source:=tblRange, _
+        XlListObjectHasHeaders:=xlYes)
+    
+    tbl.Name = tableName
+    
+    Set ImportTextToTable = tbl
+    
+End Function
+
+
+'=============================
+' テーブル → CSV
+'=============================
+Private Sub ExportTableToCSV(tbl As ListObject, filePath As String)
+
+    Dim fso As Object
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    
+    Dim ts As Object
+    Set ts = fso.CreateTextFile(filePath, True, False)
+    
+    Dim r As ListRow
+    Dim c As ListColumn
+    
+    Dim line As String
+    
+    'ヘッダー
+    line = ""
+    For Each c In tbl.ListColumns
+        line = line & c.Name & ","
+    Next
+    line = Left(line, Len(line) - 1)
+    ts.WriteLine line
+    
+    'データ
+    For Each r In tbl.ListRows
+        
+        line = ""
+        
+        For Each c In tbl.ListColumns
+            line = line & r.Range.Cells(1, c.Index).Value & ","
+        Next
+        
+        line = Left(line, Len(line) - 1)
+        ts.WriteLine line
+        
+    Next
+    
+    ts.Close
+    
+End Sub
