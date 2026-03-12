@@ -1,0 +1,16 @@
+Sub RunConvert()
+
+    Dim batPath As String
+    Dim inputFile As String
+    Dim outputDir As String
+    Dim cmd As String
+
+    batPath = "D:\Tool\convert_pipeline.bat"
+    inputFile = "D:\Data\source.json"
+    outputDir = "D:\Data\Output"
+
+    cmd = "cmd /c """ & batPath & """ """ & inputFile & """ """ & outputDir & """"
+
+    Shell cmd, vbNormalFocus
+
+End Sub
