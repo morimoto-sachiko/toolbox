@@ -17,3 +17,15 @@ DLLの設定でx64にする
 
 
 改行コード問題
+
+
+#include <iomanip>
+
+std::ofstream ofs("player.json");
+
+ofs << std::setw(4) << data
+
+setw(4)←タブ
+
+↓バイナリ
+std::ofstream ofs("test.json", std::ios::binary);
