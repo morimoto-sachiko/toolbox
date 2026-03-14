@@ -1,4 +1,0 @@
-if (root["Players"] is JsonArray)
-{
-    root["Players"] = JsonSerializer.SerializeToNode(newPlayers);
-}
