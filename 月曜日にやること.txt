@@ -1,31 +1,60 @@
-DLL設定x64
+■ 解決手順（確実に直る構成）
+① 出力フォルダに DLL をコピーさせる
 
-C#　プロジェクト　→　プロパティ　32ビットのチェックを外す
-AnyCPUもやめる
+.csproj を直接編集します（これが一番安定します）
 
-
-C++　ビルドイベント　→　ビルド後
-
-　copy "$(TargetPath)" "..\ConsoleApp1\bin\x64\Debug\"
-
-DLLのコピー
-
-BATファイルがある場合のみ実行する
-
-DLLの設定でx64にする
+<PropertyGroup>
+  <TargetFramework>net48</TargetFramework>
+  <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+</PropertyGroup>
 
 
+② NuGetパッケージを明示的に再追加
 
-改行コード問題
+一度壊れている可能性があるため、入れ直します
+
+System.Text.Json
+
+※ Visual Studio 2019の場合、以下も自動で入るはずですが、念のため確認
+
+System.Memory
+System.Buffers
+System.Runtime.CompilerServices.Unsafe
 
 
-#include <iomanip>
+③ ビルド後の出力を確認
 
-std::ofstream ofs("player.json");
+bin/Debug または bin/Release に以下があるか確認
 
-ofs << std::setw(4) << data
+System.Text.Json.dll
+System.Memory.dll
+System.Buffers.dll
+System.Runtime.CompilerServices.Unsafe.dll
 
-setw(4)←タブ
+1つでも欠けていたらNG
 
-↓バイナリ
-std::ofstream ofs("test.json", std::ios::binary);
+④ EXE単体でなく「フォルダごと実行」
+
+NG例：
+
+MyApp.exe だけコピーして実行
+
+OK例：
+
+bin/Release フォルダごとコピーして実行
+
+
+⑤ （必要なら）bindingRedirectを追加
+
+.config に以下を追加
+
+<configuration>
+  <runtime>
+    <assemblyBinding xmlns="urn:schemas-microsoft-com:asm.v1">
+      <dependentAssembly>
+        <assemblyIdentity name="System.Text.Json" publicKeyToken="cc7b13ffcd2ddd51" culture="neutral" />
+        <bindingRedirect oldVersion="0.0.0.0-10.0.0.5" newVersion="10.0.0.5" />
+      </dependentAssembly>
+    </assemblyBinding>
+  </runtime>
+</configuration>
