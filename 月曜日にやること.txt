@@ -1,60 +1,143 @@
-■ 解決手順（確実に直る構成）
-① 出力フォルダに DLL をコピーさせる
+using System;
+using System.IO;
+using System.Text;
+using System.Text.Json;
 
-.csproj を直接編集します（これが一番安定します）
+namespace NormanJsonFormatter
+{
+    public static class Program
+    {
+        static void Main(string[] args)
+        {
+            if (args.Length < 2)
+            {
+                Console.WriteLine("Usage: NormanJsonFormatter <input.json> <output.json>");
+                return;
+            }
 
-<PropertyGroup>
-  <TargetFramework>net48</TargetFramework>
-  <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-</PropertyGroup>
+            string inputPath = args[0];
+            string outputPath = args[1];
 
+            string jsonText = File.ReadAllText(inputPath);
 
-② NuGetパッケージを明示的に再追加
+            using var document = JsonDocument.Parse(jsonText);
 
-一度壊れている可能性があるため、入れ直します
+            string result = ConvertToNormanJson(document.RootElement);
 
-System.Text.Json
+            // ★ UTF-8（BOMなし）＋ LF固定
+            var utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+            File.WriteAllText(outputPath, result, utf8NoBom);
 
-※ Visual Studio 2019の場合、以下も自動で入るはずですが、念のため確認
+            Console.WriteLine("Convert Complete.");
+        }
 
-System.Memory
-System.Buffers
-System.Runtime.CompilerServices.Unsafe
+        private static string ConvertToNormanJson(JsonElement root)
+        {
+            var sb = new StringBuilder(1024);
+            var writer = new NormanJsonWriter(sb);
 
+            WriteElement(root, writer, isInArray: false, indentLevel: 0);
 
-③ ビルド後の出力を確認
+            return sb.ToString();
+        }
 
-bin/Debug または bin/Release に以下があるか確認
+        private static void WriteElement(JsonElement element, NormanJsonWriter writer, bool isInArray, int indentLevel)
+        {
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    WriteObject(element, writer, isInArray, indentLevel);
+                    break;
 
-System.Text.Json.dll
-System.Memory.dll
-System.Buffers.dll
-System.Runtime.CompilerServices.Unsafe.dll
+                case JsonValueKind.Array:
+                    writer.Write("[\n");
 
-1つでも欠けていたらNG
+                    bool first = true;
+                    foreach (var item in element.EnumerateArray())
+                    {
+                        if (!first)
+                            writer.Write(",\n");
 
-④ EXE単体でなく「フォルダごと実行」
+                        writer.WriteIndent(indentLevel + 1);
+                        WriteElement(item, writer, isInArray: true, indentLevel + 1);
 
-NG例：
+                        first = false;
+                    }
 
-MyApp.exe だけコピーして実行
+                    writer.Write("\n");
+                    writer.WriteIndent(indentLevel);
+                    writer.Write("]");
+                    break;
 
-OK例：
+                case JsonValueKind.String:
+                    writer.Write(JsonSerializer.Serialize(element.GetString()));
+                    break;
 
-bin/Release フォルダごとコピーして実行
+                case JsonValueKind.Number:
+                case JsonValueKind.True:
+                case JsonValueKind.False:
+                    writer.Write(element.GetRawText());
+                    break;
 
+                case JsonValueKind.Null:
+                    writer.Write("null");
+                    break;
+            }
+        }
 
-⑤ （必要なら）bindingRedirectを追加
+        private static void WriteObject(JsonElement element, NormanJsonWriter writer, bool isInArray, int indentLevel)
+        {
+            if (isInArray)
+            {
+                writer.Write("  "); // ← 仕様対応
+            }
 
-.config に以下を追加
+            writer.Write("{\n");
 
-<configuration>
-  <runtime>
-    <assemblyBinding xmlns="urn:schemas-microsoft-com:asm.v1">
-      <dependentAssembly>
-        <assemblyIdentity name="System.Text.Json" publicKeyToken="cc7b13ffcd2ddd51" culture="neutral" />
-        <bindingRedirect oldVersion="0.0.0.0-10.0.0.5" newVersion="10.0.0.5" />
-      </dependentAssembly>
-    </assemblyBinding>
-  </runtime>
-</configuration>
+            bool first = true;
+            foreach (var prop in element.EnumerateObject())
+            {
+                if (!first)
+                    writer.Write(",\n");
+
+                writer.WriteIndent(indentLevel + 1);
+
+                writer.Write(JsonSerializer.Serialize(prop.Name));
+                writer.Write(": ");
+
+                WriteElement(prop.Value, writer, isInArray: false, indentLevel + 1);
+
+                first = false;
+            }
+
+            writer.Write("\n");
+            writer.WriteIndent(indentLevel);
+            writer.Write("}");
+        }
+    }
+
+    public class NormanJsonWriter
+    {
+        private readonly StringBuilder _sb;
+        private const string IndentUnit = "  ";
+
+        public NormanJsonWriter(StringBuilder sb)
+        {
+            _sb = sb;
+        }
+
+        public void Write(string text)
+        {
+            // LF固定
+            _sb.Append(text.Replace("\r\n", "\n").Replace("\r", "\n"));
+        }
+
+        public void WriteIndent(int level)
+        {
+            for (int i = 0; i < level; i++)
+            {
+                _sb.Append(IndentUnit);
+            }
+        }
+    }
+}
